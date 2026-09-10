@@ -1,0 +1,24 @@
+{
+  "name": "xorvai",
+  "version": "1.0.0",
+  "description": "An adversarial AI that tries to kill your startup before the market does.",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "check": "node --test && npx wrangler deploy --dry-run"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ayush-ASB9/xorvai.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/ayush-ASB9/xorvai/issues"
+  },
+  "homepage": "https://github.com/ayush-ASB9/xorvai#readme"
+}
