@@ -58,7 +58,7 @@ It runs as a free Render web service (Node runtime, free plan, `npm install` / `
 
 | Variable | Needed for |
 | --- | --- |
-| `ANTHROPIC_API_KEY` | The Claude Sonnet 5.5 judge, through the Anthropic-compatible gateway at `https://ai.kavyansh.org`. Without it, the deterministic local judge runs. |
+| `ANTHROPIC_API_KEY` | The Claude Sonnet 5.5 judge, through the Anthropic-compatible. Without it, the deterministic local judge runs. |
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Saving waitlist emails. Create a free database at console.upstash.com and copy both from its REST section. Without them, emails are lost whenever the server sleeps. |
 | `ADMIN_TOKEN` | The `/admin` page, which stays locked until it is set. |
 | `TAVILY_API_KEY` | General web search during research. Get a free key (1,000 searches a month, no card) at app.tavily.com; each analysis uses 4, so about 250 analyses a month. Without it, research uses only Google News, Hacker News and GitHub. |
