@@ -52,19 +52,21 @@ Still being built, tested, and improved.
 
 ## Running it
 
-XORVAI deploys to Vercel: `public/` is the static frontend and `api/index.js` is one Vercel Function that serves every `/api/*` route. `vercel.json` does the routing.
+XORVAI is one Node server: `server.js` serves the frontend in `public/` and passes `/api/*` to `src/api.js`. It has no npm dependencies.
 
-Set these in Vercel → Project → Settings → Environment Variables, then redeploy:
+It runs as a free Render web service (Node runtime, free plan, `npm install` / `npm start`) that redeploys on every push to `main`. Set these on the service's **Environment** page:
 
 | Variable | Needed for |
 | --- | --- |
 | `ANTHROPIC_API_KEY` | The Claude Sonnet 5.5 judge, through the Anthropic-compatible gateway at `https://ai.kavyansh.org`. Without it, the deterministic local judge runs. |
-| Upstash Redis (`KV_REST_API_URL`, `KV_REST_API_TOKEN`) | Saving waitlist emails. Add it from Vercel → Storage → Upstash Redis and it sets both. Without it, emails are lost on every cold start. |
-| `ADMIN_TOKEN` | The `/admin` page. |
+| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Saving waitlist emails. Create a free database at console.upstash.com and copy both from its REST section. Without them, emails are lost whenever the server sleeps. |
+| `ADMIN_TOKEN` | The `/admin` page, which stays locked until it is set. |
 
 Optional: `ANTHROPIC_BASE_URL` (set it to `https://api.anthropic.com` to call Anthropic directly) and `ANTHROPIC_MODEL`.
 
-Local dev: `npm run dev` serves the app on port 3000 with the same routing, reading variables from `.env.local` (gitignored). `npm test` runs the tests. `GET /api/health` shows which judge is active.
+The free service sleeps after 15 minutes without traffic, and the next visit takes about a minute to wake it.
+
+Local dev: `npm run dev` serves the app on port 3000, reading variables from `.env.local` (gitignored). `npm test` runs the tests. `GET /api/health` shows which judge is active.
 
 ## Disclaimer
 

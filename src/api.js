@@ -1,9 +1,9 @@
-import { createAIProvider } from '../src/ai/provider.js';
-import { normalizeIdeaInput } from '../src/utils/validation.js';
-import { orchestrateAnalysis } from '../src/agents/orchestrator.js';
+import { createAIProvider } from './ai/provider.js';
+import { normalizeIdeaInput } from './utils/validation.js';
+import { orchestrateAnalysis } from './agents/orchestrator.js';
 
 // Waitlist users live in one Upstash Redis hash keyed by email. Without Redis credentials,
-// such as in local dev, they are kept in memory and lost when the process restarts.
+// such as in local dev, they are kept in memory and lost when the server restarts or sleeps.
 const USERS_HASH = 'xorvai:users';
 const MEMORY_USERS = globalThis.__xorvaiUsers ?? new Map();
 globalThis.__xorvaiUsers = MEMORY_USERS;
@@ -42,10 +42,10 @@ function timingSafeEqual(left, right) {
   return diff === 0;
 }
 
-// Vercel's Upstash integration sets the KV_* names; the Upstash console shows the UPSTASH_* names.
+// The REST URL and token from the Upstash console (free tier, no card needed).
 function getRedisConfig(env) {
-  const url = env.UPSTASH_REDIS_REST_URL || env.KV_REST_API_URL;
-  const token = env.UPSTASH_REDIS_REST_TOKEN || env.KV_REST_API_TOKEN;
+  const url = env.UPSTASH_REDIS_REST_URL;
+  const token = env.UPSTASH_REDIS_REST_TOKEN;
   return url && token ? { url, token } : null;
 }
 
@@ -166,14 +166,11 @@ function isAdminAuthorized(request, env) {
   return timingSafeEqual(token, provided);
 }
 
-// The single Vercel Function behind every /api/* route; vercel.json rewrites them here and
-// the request keeps its original path. Static files and client routes never reach it.
+// Handles every /api/* route; server.js passes those requests here as web-standard Requests.
 export default {
   async fetch(request) {
     const env = process.env;
-    const url = new URL(request.url);
-    // Deployed functions see the original path; `vercel dev` shows /api with the ?path= the rewrite adds.
-    const pathname = url.pathname === '/api' ? `/api/${url.searchParams.get('path') || ''}` : url.pathname;
+    const { pathname } = new URL(request.url);
 
     if (request.method === 'GET' && pathname === '/api/health') {
       const ai = await createAIProvider(env);
@@ -246,7 +243,7 @@ export default {
       try {
         const body = await request.json();
         const input = normalizeIdeaInput(body || {});
-        const { generateThesis } = await import('../src/agents/thesis.js');
+        const { generateThesis } = await import('./agents/thesis.js');
         return Response.json({ ok: true, data: generateThesis(input) });
       } catch (error) {
         return Response.json({ ok: false, error: error.message }, { status: 400 });
@@ -257,7 +254,7 @@ export default {
       try {
         const body = await request.json();
         const input = normalizeIdeaInput(body || {});
-        const { runResearch } = await import('../src/agents/research.js');
+        const { runResearch } = await import('./agents/research.js');
         const result = await runResearch(input, []);
         return Response.json({ ok: true, data: result });
       } catch (error) {

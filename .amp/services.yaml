@@ -1,6 +1,6 @@
 services:
   web:
-    # Local stand-in for Vercel: the API function plus public/, routed like vercel.json.
+    # The same server.js that runs on Render.
     # ANTHROPIC_API_KEY comes from the Amp project secret.
     command: npm run dev
     health: /api/health

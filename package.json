@@ -2,10 +2,11 @@
   "name": "xorvai",
   "version": "1.0.0",
   "description": "An adversarial AI that tries to kill your startup before the market does.",
-  "main": "api/index.js",
+  "main": "server.js",
   "scripts": {
-    "test": "node --test",
-    "dev": "node --env-file-if-exists=.env.local scripts/dev.js"
+    "start": "node server.js",
+    "dev": "node --env-file-if-exists=.env.local server.js",
+    "test": "node --test"
   },
   "repository": {
     "type": "git",

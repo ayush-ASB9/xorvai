@@ -7,4 +7,4 @@
 - Keep every stage explicit: thesis, research, evidence, contradictions, team, strategy, judge, verdict.
 - Prefer deterministic local behavior with mock fallback when no external service is available.
 - No paid API requirements or hidden credentials in browser code.
-- Deploy target is Vercel: static files in `public/`, all API routes in the single `api/index.js` function, routing in `vercel.json`.
+- Deploy target is a Render free web service (`render.yaml`): `server.js` serves `public/` and passes `/api/*` to `src/api.js`.

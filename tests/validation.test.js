@@ -170,7 +170,7 @@ test('Cook opportunities generate strategic, evidence-grounded product ideas', (
 });
 
 test('Waitlist users persist in Upstash Redis across register, admin list, and delete', async () => {
-  const { default: api } = await import('../api/index.js');
+  const { default: api } = await import('../src/api.js');
   const originalFetch = global.fetch;
   const savedEnv = { ...process.env };
   const hash = new Map();
@@ -186,7 +186,7 @@ test('Waitlist users persist in Upstash Redis across register, admin list, and d
     };
     return Response.json({ result: results[command]() });
   };
-  Object.assign(process.env, { KV_REST_API_URL: 'https://redis.example', KV_REST_API_TOKEN: 'redis-token', ADMIN_TOKEN: 'admin-secret' });
+  Object.assign(process.env, { UPSTASH_REDIS_REST_URL: 'https://redis.example', UPSTASH_REDIS_REST_TOKEN: 'redis-token', ADMIN_TOKEN: 'admin-secret' });
 
   const call = async (method, path, body, headers = {}) => {
     const response = await api.fetch(new Request(`http://localhost${path}`, { method, headers: { 'content-type': 'application/json', ...headers }, body: body && JSON.stringify(body) }));

@@ -1,11 +1,11 @@
-// Local stand-in for Vercel's routing in vercel.json: existing files come from public/,
-// /api/* goes to the API function, and /app* and /admin* get index.html.
+// The XORVAI web server, in production on Render and locally with `npm run dev`: /api/* goes to
+// src/api.js, existing files come from public/, and /app* and /admin* get index.html.
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join } from 'node:path';
-import api from '../api/index.js';
+import api from './src/api.js';
 
-const PUBLIC_DIR = new URL('../public/', import.meta.url).pathname;
+const PUBLIC_DIR = new URL('./public/', import.meta.url).pathname;
 const CONTENT_TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -44,6 +44,7 @@ createServer(async (req, res) => {
     res.end(content);
   } catch (error) {
     res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
-    res.end(`Dev server error: ${error.message}`);
+    res.end('Server error');
+    console.error(error);
   }
-}).listen(port, () => console.log(`XORVAI dev server on http://localhost:${port}`));
+}).listen(port, () => console.log(`XORVAI listening on port ${port}`));
