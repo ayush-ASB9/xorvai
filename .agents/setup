@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Prepares a fresh Amp orb: installs npm dependencies (including the pinned wrangler and its workerd runtime).
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+step() {
+  local start=$SECONDS
+  echo "==> $*"
+  "$@"
+  echo "    done in $((SECONDS - start))s"
+}
+
+step node --version
+# npm install reuses node_modules restored from a stale snapshot; npm ci would delete and redownload it.
+step npm install --no-audit --no-fund --prefer-offline
+step npx --no-install wrangler --version

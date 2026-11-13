@@ -20,5 +20,8 @@
   "bugs": {
     "url": "https://github.com/ayush-ASB9/xorvai/issues"
   },
-  "homepage": "https://github.com/ayush-ASB9/xorvai#readme"
+  "homepage": "https://github.com/ayush-ASB9/xorvai#readme",
+  "devDependencies": {
+    "wrangler": "^4.161.0"
+  }
 }
