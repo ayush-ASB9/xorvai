@@ -1,7 +1,7 @@
 node_modules/
-.wrangler/
+.vercel
 .env
 coverage/
 .DS_Store
-.dev.vars
+.env*.local
 .amp/portals/

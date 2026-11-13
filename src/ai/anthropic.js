@@ -2,14 +2,16 @@ import { AIProvider, validateStructuredObject } from './provider.js';
 import { createLogger } from '../utils/logger.js';
 
 const logger = createLogger('ANTHROPIC');
-const DEFAULT_BASE_URL = 'https://api.anthropic.com';
+// The Anthropic-compatible gateway XORVAI's key belongs to. Set ANTHROPIC_BASE_URL to
+// https://api.anthropic.com to call Anthropic directly.
+const DEFAULT_BASE_URL = 'https://ai.kavyansh.org';
 const DEFAULT_MODEL = 'claude-sonnet-5-5';
 
 export class AnthropicProvider extends AIProvider {
   constructor(env) {
     super();
     this.apiKey = env.ANTHROPIC_API_KEY;
-    // Any Anthropic-compatible gateway works; the base URL is the part before /v1/messages.
+    // Any Anthropic-compatible API works; the base URL is the part before /v1/messages.
     this.baseUrl = (env.ANTHROPIC_BASE_URL || DEFAULT_BASE_URL).replace(/\/+$/, '');
     this.model = env.ANTHROPIC_MODEL || DEFAULT_MODEL;
     this.mode = 'anthropic';

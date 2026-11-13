@@ -1,11 +1,8 @@
 services:
   web:
-    # Local Worker with static assets and in-memory KV. CLOUDFLARE_INCLUDE_PROCESS_ENV passes Amp
-    # secrets such as ANTHROPIC_API_KEY to the Worker, so no .dev.vars file is needed in orbs.
-    command: npx wrangler dev --ip 0.0.0.0 --port "$PORT" --show-interactive-dev-session=false
-    env:
-      CLOUDFLARE_INCLUDE_PROCESS_ENV: "true"
-      WRANGLER_SEND_METRICS: "false"
+    # Local stand-in for Vercel: the API function plus public/, routed like vercel.json.
+    # ANTHROPIC_API_KEY comes from the Amp project secret.
+    command: npm run dev
     health: /api/health
     portal:
       title: XORVAI

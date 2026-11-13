@@ -50,15 +50,21 @@ Still being built, tested, and improved.
 - AI
 - GitHub
 
-## AI model setup
+## Running it
 
-The judge runs on Claude Sonnet 5.5 through an Anthropic-compatible Messages API. `ANTHROPIC_BASE_URL` in `wrangler.jsonc` points at the gateway (`https://ai.kavyansh.org`); remove it to call Anthropic directly.
+XORVAI deploys to Vercel: `public/` is the static frontend and `api/index.js` is one Vercel Function that serves every `/api/*` route. `vercel.json` does the routing.
 
-- Production: `npx wrangler secret put ANTHROPIC_API_KEY`, then paste the gateway key.
-- Local dev: put `ANTHROPIC_API_KEY=...` in `.dev.vars` (gitignored). In Amp orbs it comes from the project secret.
-- Optional: set `ANTHROPIC_MODEL` to use another model the gateway serves.
+Set these in Vercel → Project → Settings → Environment Variables, then redeploy:
 
-Without a key, XORVAI falls back to its deterministic local judge. `GET /api/health` shows which one is active.
+| Variable | Needed for |
+| --- | --- |
+| `ANTHROPIC_API_KEY` | The Claude Sonnet 5.5 judge, through the Anthropic-compatible gateway at `https://ai.kavyansh.org`. Without it, the deterministic local judge runs. |
+| Upstash Redis (`KV_REST_API_URL`, `KV_REST_API_TOKEN`) | Saving waitlist emails. Add it from Vercel → Storage → Upstash Redis and it sets both. Without it, emails are lost on every cold start. |
+| `ADMIN_TOKEN` | The `/admin` page. |
+
+Optional: `ANTHROPIC_BASE_URL` (set it to `https://api.anthropic.com` to call Anthropic directly) and `ANTHROPIC_MODEL`.
+
+Local dev: `npm run dev` serves the app on port 3000 with the same routing, reading variables from `.env.local` (gitignored). `npm test` runs the tests. `GET /api/health` shows which judge is active.
 
 ## Disclaimer
 

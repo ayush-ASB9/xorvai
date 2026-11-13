@@ -169,37 +169,47 @@ test('Cook opportunities generate strategic, evidence-grounded product ideas', (
   assert.ok(opportunities.every((opportunity) => typeof opportunity.cheapest_test === 'string'));
 });
 
-test('Admin users list reads the actual KV values instead of metadata', async () => {
-  const { default: worker } = await import('../src/index.js');
-  const kv = {
-    prefix: 'user:',
-    async list({ prefix }) {
-      assert.equal(prefix, 'user:');
-      return {
-        keys: [{ name: 'user:ayushsinghbhuranda@gmail.com' }],
-      };
-    },
-    async get(key) {
-      assert.equal(key, 'user:ayushsinghbhuranda@gmail.com');
-      return JSON.stringify({
-        email: 'ayushsinghbhuranda@gmail.com',
-        createdAt: '2026-09-11T00:00:00.000Z',
-        lastSeenAt: '2026-09-11T00:00:00.000Z',
-      });
-    },
+test('Waitlist users persist in Upstash Redis across register, admin list, and delete', async () => {
+  const { default: api } = await import('../api/index.js');
+  const originalFetch = global.fetch;
+  const savedEnv = { ...process.env };
+  const hash = new Map();
+  global.fetch = async (url, init) => {
+    assert.equal(String(url), 'https://redis.example');
+    assert.equal(init.headers.Authorization, 'Bearer redis-token');
+    const [command, , field, value] = JSON.parse(init.body);
+    const results = {
+      HGET: () => hash.get(field) ?? null,
+      HSET: () => (hash.set(field, value), 1),
+      HDEL: () => Number(hash.delete(field)),
+      HGETALL: () => [...hash].flat(),
+    };
+    return Response.json({ result: results[command]() });
   };
+  Object.assign(process.env, { KV_REST_API_URL: 'https://redis.example', KV_REST_API_TOKEN: 'redis-token', ADMIN_TOKEN: 'admin-secret' });
 
-  const request = new Request('http://localhost/api/admin/users', {
-    headers: { Authorization: 'Bearer xorvai-dev-admin' },
-  });
+  const call = async (method, path, body, headers = {}) => {
+    const response = await api.fetch(new Request(`http://localhost${path}`, { method, headers: { 'content-type': 'application/json', ...headers }, body: body && JSON.stringify(body) }));
+    return { status: response.status, json: await response.json() };
+  };
+  const admin = { Authorization: 'Bearer admin-secret' };
 
-  const response = await worker.fetch(request, { XORVAI_USERS: kv, ADMIN_TOKEN: 'xorvai-dev-admin' }, {});
-  const json = await response.json();
-  assert.equal(response.status, 200);
-  assert.equal(json.ok, true);
-  assert.equal(Array.isArray(json.data), true);
-  assert.equal(json.data[0].email, 'ayushsinghbhuranda@gmail.com');
-  assert.equal(json.data[0].createdAt, '2026-09-11T00:00:00.000Z');
+  try {
+    assert.equal((await call('POST', '/api/register', { email: ' Ayush@Example.com ' })).json.data.users, 1);
+    assert.equal((await call('POST', '/api/register', { email: 'ayush@example.com' })).json.data.users, 1);
+    assert.equal((await call('POST', '/api/register', { email: 'second@example.com' })).json.data.users, 2);
+
+    assert.equal((await call('GET', '/api/admin/users')).status, 401);
+    const listed = await call('GET', '/api/admin/users', undefined, admin);
+    assert.deepEqual(listed.json.data.map((user) => user.email).sort(), ['ayush@example.com', 'second@example.com']);
+
+    await call('DELETE', '/api/admin/users', { email: 'second@example.com' }, admin);
+    assert.equal((await call('GET', '/api/stats')).json.data.users, 1);
+    assert.deepEqual([...hash.keys()], ['ayush@example.com']);
+  } finally {
+    global.fetch = originalFetch;
+    process.env = savedEnv;
+  }
 });
 
 test('Orchestrator uses the Claude judge verdict from the configured Anthropic-compatible gateway', async () => {

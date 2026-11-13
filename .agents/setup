@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Prepares a fresh Amp orb: installs npm dependencies (including the pinned wrangler and its workerd runtime).
+# Prepares a fresh Amp orb. The app has no npm dependencies; this checks the toolchain and
+# installs anything package-lock.json adds later.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -13,4 +14,3 @@ step() {
 step node --version
 # npm install reuses node_modules restored from a stale snapshot; npm ci would delete and redownload it.
 step npm install --no-audit --no-fund --prefer-offline
-step npx --no-install wrangler --version
