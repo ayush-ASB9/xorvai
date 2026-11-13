@@ -5,9 +5,7 @@ import { buildEvidenceSet } from '../src/analysis/evidence.js';
 import { findContradictions } from '../src/analysis/contradictions.js';
 import { determineVerdict } from '../src/analysis/verdict.js';
 import { orchestrateAnalysis } from '../src/agents/orchestrator.js';
-import { directFetchSource } from '../src/research/sources/directFetch.js';
-import { deduplicateEvidence } from '../src/research/evidenceExtractor.js';
-import { runResearchSources } from '../src/research/researchRunner.js';
+import { runResearch } from '../src/agents/research.js';
 import { assessTeamFit } from '../src/analysis/teamFit.js';
 import { deriveCookOpportunities } from '../src/analysis/cook.js';
 
@@ -42,54 +40,137 @@ test('Verdict logic can choose KILL or BUILD', () => {
   assert.equal(determineVerdict({ contradictions: [], unknown: [] }).verdict, 'BUILD');
 });
 
-test('Research source succeeds for a valid public URL', async () => {
+// Answers the requests research makes: Google News RSS, Hacker News, GitHub, a founder page,
+// and the AI gateway, which plans queries and then screens the numbered results.
+function fakeResearchWeb({ hackerNewsStatus = 200, tavilyStatus = 200 } = {}) {
+  const calls = { searches: [], prompts: [], tavilyKeys: [] };
+  const fetch = async (url, init = {}) => {
+    const target = new URL(String(url));
+    if (target.hostname === 'gateway.example') {
+      const body = JSON.parse(init.body);
+      const prompt = body.messages[0].content;
+      calls.prompts.push(prompt);
+      const properties = body.output_config.format.schema.properties;
+      let answer;
+      if (properties.demand) {
+        answer = { demand: ['society maintenance dues', '"RWA" collections in Indian housing societies today'], 'current-behavior': ['society maintenance excel'], competition: ['society management app', 'MyGate'], 'negative-evidence': ['maintenance app complaints'] };
+      } else if (properties.evidence) {
+        const indexOf = (title) => Number(prompt.match(new RegExp(`\\[(\\d+)\\][^\\n]*\\n${title}`))[1]);
+        answer = { evidence: [
+          { index: indexOf('acme/society-billing'), claim: 'An open-source society billing tool already exists.', classification: 'FACT', stance: 'contradicts', assumption: 'no free alternative', strength: 4, reasoning: 'A free substitute caps pricing.' },
+          { index: indexOf('Residents protest unpaid maintenance'), claim: 'Societies struggle to collect dues.', classification: 'SIGNAL', stance: 'supports', assumption: 'collection is painful', strength: 3, reasoning: 'Shows the pain is real.' },
+        ] };
+      } else {
+        answer = { verdict: 'REWORK', reasoning: 'Mixed evidence.', strongest_evidence: [], strongest_contradiction: [], biggest_unknown: 'Pricing', kill_conditions: [], confidence: 0.6 };
+      }
+      return Response.json({ content: [{ type: 'text', text: JSON.stringify(answer) }], stop_reason: 'end_turn' });
+    }
+
+    if (target.hostname === 'api.tavily.com') {
+      const body = JSON.parse(init.body);
+      calls.searches.push(['Web', body.query]);
+      calls.tavilyKeys.push(init.headers.Authorization);
+      if (tavilyStatus !== 200) return Response.json({ detail: { error: 'limit' } }, { status: tavilyStatus });
+      return Response.json({ results: [{ title: 'Why RWAs still chase dues on WhatsApp', url: `https://www.blog.example/${encodeURIComponent(body.query)}`, content: 'Treasurers in 40 Pune societies said they reconcile UPI screenshots by hand.', published_date: 'Mon, 02 Nov 2026 10:00:00 GMT' }] });
+    }
+    if (target.hostname === 'news.google.com') {
+      calls.searches.push(['Google News', target.searchParams.get('q')]);
+      return new Response(`<rss><channel><item><title>Residents protest unpaid maintenance - City Times</title><link>https://news.example/maintenance</link><pubDate>Tue, 03 Nov 2026 08:00:00 GMT</pubDate><source url="https://news.example">City Times</source></item></channel></rss>`);
+    }
+    if (target.hostname === 'hn.algolia.com') {
+      calls.searches.push(['Hacker News', target.searchParams.get('query')]);
+      return hackerNewsStatus === 200 ? Response.json({ hits: [{ objectID: '42', title: 'Ask HN: Running a housing society', points: 12, num_comments: 7, created_at: '2026-10-01T00:00:00Z' }] }) : new Response('', { status: hackerNewsStatus });
+    }
+    if (target.hostname === 'api.github.com') {
+      calls.searches.push(['GitHub', target.searchParams.get('q')]);
+      return Response.json({ items: [{ full_name: 'acme/society-billing', html_url: 'https://github.com/acme/society-billing', stargazers_count: 310, description: 'Maintenance billing for housing societies', pushed_at: '2026-09-01T00:00:00Z' }] });
+    }
+    if (target.hostname === 'startup.example') {
+      return new Response('<html><head><title>SocietyPay</title></head><body><script>trackVisitor()</script><p>Collect society dues over UPI.</p></body></html>');
+    }
+    return new Response('', { status: 404 });
+  };
+  return { calls, fetch };
+}
+
+test('Research searches the web with planned queries and keeps the screened evidence', async () => {
+  const { createAIProvider } = await import('../src/ai/provider.js');
+  const web = fakeResearchWeb({ hackerNewsStatus: 503 });
   const originalFetch = global.fetch;
-  global.fetch = async () => new Response('<html><body><h1>Demand is real</h1><p>People need this.</p></body></html>', { status: 200 });
+  global.fetch = web.fetch;
 
   try {
-    const result = await directFetchSource('https://example.com');
-    assert.equal(result.ok, true);
-    assert.equal(Array.isArray(result.data), true);
-    assert.ok(result.data.length > 0);
-    assert.equal(result.source.status, 'available');
+    const ai = await createAIProvider({ ANTHROPIC_API_KEY: 'key', ANTHROPIC_BASE_URL: 'https://gateway.example' });
+    const research = await runResearch({ idea: 'UPI maintenance collection for housing societies', startupUrl: 'https://startup.example/' }, ai);
+
+    // Every planned query runs, cut to 5 words without quotes; GitHub runs only for competitors.
+    const newsQueries = web.calls.searches.filter(([source]) => source === 'Google News').map(([, query]) => query);
+    assert.deepEqual(newsQueries.slice(0, 2), ['society maintenance dues', 'RWA collections in Indian housing']);
+    assert.deepEqual(web.calls.searches.filter(([source]) => source === 'GitHub'), [['GitHub', 'society management app'], ['GitHub', 'MyGate']]);
+
+    // The founder's page reaches the screening prompt as text, without its script.
+    const screening = web.calls.prompts.find((prompt) => prompt.includes('Results:'));
+    assert.match(screening, /Collect society dues over UPI/);
+    assert.doesNotMatch(screening, /trackVisitor/);
+
+    // Results the model dropped, such as the founder's page, are not evidence; kept ones carry its stance and strength.
+    assert.deepEqual(research.evidence.map((item) => item.url), ['https://github.com/acme/society-billing', 'https://news.example/maintenance']);
+    assert.deepEqual(research.evidence[0].contradicts, ['no free alternative']);
+    assert.equal(research.evidence[0].evidenceStrength, 4);
+    assert.deepEqual(research.evidence[1].supports, ['collection is painful']);
+    assert.ok(research.limitations.some((line) => /Hacker News search for ".+" failed: HTTP 503/.test(line)));
+    assert.equal(research.missions.find((mission) => mission.missionType === 'competition').query, 'society management app · MyGate');
   } finally {
     global.fetch = originalFetch;
   }
 });
 
-test('Research source fails gracefully when the fetch rejects', async () => {
+test('Web search runs once per mission with TAVILY_API_KEY and reports a used-up quota', async () => {
+  const { createAIProvider } = await import('../src/ai/provider.js');
   const originalFetch = global.fetch;
-  global.fetch = async () => { throw new Error('network down'); };
 
   try {
-    const result = await directFetchSource('https://example.com');
-    assert.equal(result.ok, false);
-    assert.match(result.error, /network down/);
+    const web = fakeResearchWeb();
+    global.fetch = web.fetch;
+    const ai = await createAIProvider({ ANTHROPIC_API_KEY: 'key', ANTHROPIC_BASE_URL: 'https://gateway.example' });
+    await runResearch({ idea: 'UPI maintenance collection for housing societies' }, ai, { TAVILY_API_KEY: 'tvly-test' });
+
+    // The first planned query of each mission, not every query, spends quota.
+    assert.deepEqual(web.calls.searches.filter(([source]) => source === 'Web').map(([, query]) => query), ['society maintenance dues', 'society maintenance excel', 'society management app', 'maintenance app complaints']);
+    assert.ok(web.calls.tavilyKeys.every((header) => header === 'Bearer tvly-test'));
+    const screening = web.calls.prompts.find((prompt) => prompt.includes('Results:'));
+    assert.match(screening, /Web · blog\.example · 2026-11-02/);
+    assert.match(screening, /reconcile UPI screenshots by hand/);
+
+    const exhausted = fakeResearchWeb({ tavilyStatus: 432 });
+    global.fetch = exhausted.fetch;
+    const research = await runResearch({ idea: 'UPI maintenance collection for housing societies' }, ai, { TAVILY_API_KEY: 'tvly-test' });
+    assert.ok(research.limitations.some((line) => /Web search for ".+" failed: the monthly Tavily search quota is used up/.test(line)));
+
+    const keyless = fakeResearchWeb();
+    global.fetch = keyless.fetch;
+    await runResearch({ idea: 'UPI maintenance collection for housing societies' }, ai, {});
+    assert.equal(keyless.calls.searches.filter(([source]) => source === 'Web').length, 0);
   } finally {
     global.fetch = originalFetch;
   }
 });
 
-test('Malformed HTML is normalized into a safe text snippet', async () => {
+test('Research without an AI key still searches and lists unscreened results', async () => {
+  const { createAIProvider } = await import('../src/ai/provider.js');
+  const web = fakeResearchWeb();
   const originalFetch = global.fetch;
-  global.fetch = async () => new Response('<html><body><script>bad()</script><div>We observed <b>urgent</b> demand in the market.</div></body></html>', { status: 200 });
+  global.fetch = web.fetch;
 
   try {
-    const result = await directFetchSource('https://example.com');
-    assert.equal(result.ok, true);
-    assert.ok(result.data[0].excerpt.includes('urgent') || result.data[0].excerpt.length > 0);
+    const research = await runResearch({ idea: 'An app that helps housing societies collect maintenance over UPI' }, await createAIProvider({}));
+    assert.ok(web.calls.searches.every(([, query]) => query === 'housing societies collect maintenance'));
+    assert.deepEqual(research.evidence.map((item) => item.url).sort(), ['https://github.com/acme/society-billing', 'https://news.example/maintenance', 'https://news.ycombinator.com/item?id=42']);
+    assert.ok(research.evidence.every((item) => item.classification === 'UNKNOWN' && item.evidenceStrength === 1));
+    assert.ok(research.limitations.some((line) => /without a relevance check/.test(line)));
   } finally {
     global.fetch = originalFetch;
   }
-});
-
-test('Duplicate evidence is deduplicated after extraction', () => {
-  const deduped = deduplicateEvidence([
-    { claim: 'Demand is real', source: { url: 'https://example.com' } },
-    { claim: 'Demand is real', source: { url: 'https://example.com' } },
-  ]);
-
-  assert.equal(deduped.length, 1);
 });
 
 test('Contradictory evidence stays visible to the analysis pipeline', () => {
@@ -99,17 +180,6 @@ test('Contradictory evidence stays visible to the analysis pipeline', () => {
 
   assert.equal(contradictions.length, 1);
   assert.match(contradictions[0].whyItMatters, /challenged/i);
-});
-
-test('Inaccessible local URLs are rejected before research starts', async () => {
-  const result = await directFetchSource('http://localhost:3000');
-  assert.equal(result.ok, false);
-  assert.equal(result.error, 'Invalid URL');
-});
-
-test('Empty research result returns an empty list', async () => {
-  const results = await runResearchSources([]);
-  assert.deepEqual(results, []);
 });
 
 test('Capability mapping makes the startup requirement explicit and strategic', () => {
@@ -250,9 +320,16 @@ test('Orchestrator falls back to the local judge when the Anthropic call fails',
 });
 
 test('Orchestrator returns structured analysis for a valid input', async () => {
-  const result = await orchestrateAnalysis({ idea: 'AI compliance workflow', startupUrl: 'https://example.com' }, {});
-  assert.equal(result.thesis.idea, 'AI compliance workflow');
-  assert.equal(Array.isArray(result.evidence), true);
-  assert.equal(Array.isArray(result.contradictions), true);
-  assert.equal(['BUILD', 'REWORK', 'KILL'].includes(result.verdict.verdict), true);
+  const originalFetch = global.fetch;
+  global.fetch = fakeResearchWeb().fetch;
+
+  try {
+    const result = await orchestrateAnalysis({ idea: 'AI compliance workflow', startupUrl: 'https://example.com' }, {});
+    assert.equal(result.thesis.idea, 'AI compliance workflow');
+    assert.equal(Array.isArray(result.evidence), true);
+    assert.equal(Array.isArray(result.contradictions), true);
+    assert.equal(['BUILD', 'REWORK', 'KILL'].includes(result.verdict.verdict), true);
+  } finally {
+    global.fetch = originalFetch;
+  }
 });

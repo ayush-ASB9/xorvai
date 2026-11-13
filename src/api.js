@@ -175,7 +175,7 @@ export default {
     if (request.method === 'GET' && pathname === '/api/health') {
       const ai = await createAIProvider(env);
       const providerStatus = await ai.healthCheck();
-      return Response.json({ ok: true, service: 'xorvai', status: 'healthy', ai: providerStatus });
+      return Response.json({ ok: true, service: 'xorvai', status: 'healthy', ai: providerStatus, webSearch: Boolean(env.TAVILY_API_KEY) });
     }
 
     if (request.method === 'POST' && pathname === '/api/register') {
@@ -255,7 +255,7 @@ export default {
         const body = await request.json();
         const input = normalizeIdeaInput(body || {});
         const { runResearch } = await import('./agents/research.js');
-        const result = await runResearch(input, []);
+        const result = await runResearch(input, await createAIProvider(env), env);
         return Response.json({ ok: true, data: result });
       } catch (error) {
         return Response.json({ ok: false, error: error.message }, { status: 400 });

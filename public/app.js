@@ -298,15 +298,17 @@ function renderReport(result = {}) {
     buildSection('CORE ASSUMPTIONS', renderValueList(assumptions)),
     buildSection('DEMAND', `
       <div class="report-block"><strong>Mission:</strong> ${escapeHtml(demandMission?.question || 'Demand research is not available yet.')}</div>
+      ${demandMission?.query ? `<div class="report-block"><strong>Searched:</strong> ${escapeHtml(demandMission.query)}</div>` : ''}
       <div class="report-block"><strong>Summary:</strong> ${escapeHtml(research.summary || 'Demand signal is not yet proven.')}</div>
+      ${research.limitations?.length ? renderValueList(research.limitations) : ''}
     `),
     buildSection('CURRENT BEHAVIOR', `
       <div class="report-block"><strong>Mission:</strong> ${escapeHtml(behaviorMission?.question || 'Current behavior research is not available yet.')}</div>
-      ${renderValueList(researchMissions.filter((mission) => String(mission.missionType || '').includes('current')).map((mission) => mission.question))}
+      ${behaviorMission?.query ? `<div class="report-block"><strong>Searched:</strong> ${escapeHtml(behaviorMission.query)}</div>` : ''}
     `),
     buildSection('COMPETITION', `
       <div class="report-block"><strong>Mission:</strong> ${escapeHtml(competitionMission?.question || 'Competition mapping is not available yet.')}</div>
-      ${renderValueList(researchMissions.filter((mission) => String(mission.missionType || '').includes('competition')).map((mission) => mission.question))}
+      ${competitionMission?.query ? `<div class="report-block"><strong>Searched:</strong> ${escapeHtml(competitionMission.query)}</div>` : ''}
     `),
     buildSection('EVIDENCE', renderEvidence(evidence)),
     buildSection('CONTRADICTIONS', renderContradictions(contradictions)),

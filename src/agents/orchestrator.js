@@ -21,7 +21,8 @@ export async function orchestrateAnalysis(input, env = {}) {
   const thesis = generateThesis(parsed);
   const assumptions = deriveAssumptions(thesis);
   const researchQuestions = buildResearchQuestions(thesis, assumptions);
-  const research = await runResearch({ ...parsed, thesis, assumptions, researchQuestions }, []);
+  const ai = await createAIProvider(env);
+  const research = await runResearch(parsed, ai, env);
   const evidence = buildEvidenceSet(research.evidence || []);
   const contradictions = runContradictionEngine(evidence);
   const team = runTeamAnalysis(parsed.teamUrls || parsed.founderUrls || [], [
@@ -55,7 +56,6 @@ export async function orchestrateAnalysis(input, env = {}) {
     initialVerdict: baseVerdict,
   };
   const judge = runAdversarialJudge(judgeInput);
-  const ai = await createAIProvider(env);
   const stringList = { type: 'array', items: { type: 'string' } };
   const modelResult = await ai.generateJSON(buildJudgePrompt(judgeInput), {
     type: 'object',

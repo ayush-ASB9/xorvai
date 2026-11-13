@@ -52,9 +52,10 @@ export class AnthropicProvider extends AIProvider {
     return text;
   }
 
-  async generateJSON(prompt, schema = {}) {
+  // effort: 'low' suits quick structured steps; omitted, the model's default (high) applies.
+  async generateJSON(prompt, schema = {}, { effort } = {}) {
     try {
-      const { text, stopReason } = await this.request(prompt, { format: { type: 'json_schema', schema } });
+      const { text, stopReason } = await this.request(prompt, { format: { type: 'json_schema', schema }, ...(effort ? { effort } : {}) });
       const parsed = JSON.parse(text);
       if (validateStructuredObject(parsed, schema.required || [])) {
         return { ...parsed, mode: this.mode, model: this.model, generatedAt: new Date().toISOString() };
