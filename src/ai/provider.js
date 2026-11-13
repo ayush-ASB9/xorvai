@@ -57,7 +57,7 @@ export class MockAIProvider extends AIProvider {
     const raw = await this.generate(prompt);
     const parsed = parseJsonText(raw);
 
-    if (parsed && validateStructuredObject(parsed, Object.keys(schema || {}))) {
+    if (parsed && validateStructuredObject(parsed, schema?.required || [])) {
       return { ...parsed, mode: 'mock', generatedAt: new Date().toISOString() };
     }
 
@@ -88,9 +88,9 @@ export class MockAIProvider extends AIProvider {
 }
 
 export async function createAIProvider(env = {}) {
-  if (typeof env?.AI !== 'undefined' && typeof env.AI.run === 'function') {
-    const { CloudflareAIProvider } = await import('./cloudflare.js');
-    return new CloudflareAIProvider(env);
+  if (env?.ANTHROPIC_API_KEY) {
+    const { AnthropicProvider } = await import('./anthropic.js');
+    return new AnthropicProvider(env);
   }
   return new MockAIProvider();
 }

@@ -50,6 +50,16 @@ Still being built, tested, and improved.
 - AI
 - GitHub
 
+## AI model setup
+
+The judge runs on Claude Sonnet 5.5 through an Anthropic-compatible Messages API. `ANTHROPIC_BASE_URL` in `wrangler.jsonc` points at the gateway (`https://ai.kavyansh.org`); remove it to call Anthropic directly.
+
+- Production: `npx wrangler secret put ANTHROPIC_API_KEY`, then paste the gateway key.
+- Local dev: put `ANTHROPIC_API_KEY=...` in `.dev.vars` (gitignored). In Amp orbs it comes from the project secret.
+- Optional: set `ANTHROPIC_MODEL` to use another model the gateway serves.
+
+Without a key, XORVAI falls back to its deterministic local judge. `GET /api/health` shows which one is active.
+
 ## Disclaimer
 
 XORVAI is an experimental research/project tool. Its analysis should not be treated as a substitute for real customer research, market validation, or professional advice.

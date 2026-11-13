@@ -202,6 +202,43 @@ test('Admin users list reads the actual KV values instead of metadata', async ()
   assert.equal(json.data[0].createdAt, '2026-09-11T00:00:00.000Z');
 });
 
+test('Orchestrator uses the Claude judge verdict from the configured Anthropic-compatible gateway', async () => {
+  const originalFetch = global.fetch;
+  let sent;
+  global.fetch = async (url, init) => {
+    if (String(url) !== 'https://gateway.example/v1/messages') return new Response('', { status: 404 });
+    sent = { headers: init.headers, body: JSON.parse(init.body) };
+    const verdict = { verdict: 'KILL', reasoning: 'Spreadsheets already solve it.', strongest_evidence: [], strongest_contradiction: ['Substitutes exist'], biggest_unknown: 'Willingness to pay', kill_conditions: ['No switching'], confidence: 0.8 };
+    return Response.json({ content: [{ type: 'text', text: JSON.stringify(verdict) }], stop_reason: 'end_turn' });
+  };
+
+  try {
+    const result = await orchestrateAnalysis({ idea: 'AI compliance workflow' }, { ANTHROPIC_API_KEY: 'test-key', ANTHROPIC_BASE_URL: 'https://gateway.example/' });
+    assert.equal(sent.headers['x-api-key'], 'test-key');
+    assert.equal(sent.body.model, 'claude-sonnet-5-5');
+    assert.equal(sent.body.output_config.format.type, 'json_schema');
+    assert.equal(result.aiProvider, 'anthropic');
+    assert.equal(result.verdict.verdict, 'KILL');
+    assert.equal(result.judge.reasoning, 'Spreadsheets already solve it.');
+    assert.equal(result.verdict.confidence, 0.8);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('Orchestrator falls back to the local judge when the Anthropic call fails', async () => {
+  const originalFetch = global.fetch;
+  global.fetch = async () => Response.json({ error: { message: 'invalid x-api-key' } }, { status: 401 });
+
+  try {
+    const result = await orchestrateAnalysis({ idea: 'AI compliance workflow' }, { ANTHROPIC_API_KEY: 'bad-key' });
+    assert.match(result.generatedModel.error, /401: invalid x-api-key/);
+    assert.equal(['BUILD', 'REWORK', 'KILL'].includes(result.verdict.verdict), true);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
 test('Orchestrator returns structured analysis for a valid input', async () => {
   const result = await orchestrateAnalysis({ idea: 'AI compliance workflow', startupUrl: 'https://example.com' }, {});
   assert.equal(result.thesis.idea, 'AI compliance workflow');

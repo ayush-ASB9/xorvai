@@ -56,14 +56,20 @@ export async function orchestrateAnalysis(input, env = {}) {
   };
   const judge = runAdversarialJudge(judgeInput);
   const ai = await createAIProvider(env);
+  const stringList = { type: 'array', items: { type: 'string' } };
   const modelResult = await ai.generateJSON(buildJudgePrompt(judgeInput), {
-    verdict: 'BUILD',
-    reasoning: 'string',
-    strongest_evidence: [''],
-    strongest_contradiction: [''],
-    biggest_unknown: 'string',
-    kill_conditions: [''],
-    confidence: 0,
+    type: 'object',
+    properties: {
+      verdict: { type: 'string', enum: ['BUILD', 'REWORK', 'KILL'] },
+      reasoning: { type: 'string' },
+      strongest_evidence: stringList,
+      strongest_contradiction: stringList,
+      biggest_unknown: { type: 'string' },
+      kill_conditions: stringList,
+      confidence: { type: 'number', description: 'Between 0.0 and 1.0' },
+    },
+    required: ['verdict', 'reasoning', 'strongest_evidence', 'strongest_contradiction', 'biggest_unknown', 'kill_conditions', 'confidence'],
+    additionalProperties: false,
   });
 
   const normalizedJudge = {
